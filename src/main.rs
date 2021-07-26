@@ -13,15 +13,15 @@ use error::Error;
 #[tokio::main]
 async fn main() -> Result<(), Error>
 {
-    let matches = clap::App::new("My Super Program")
-                          .version("1.0")
-                          .author("Kevin K. <kbknapp@gmail.com>")
-                          .about("Does awesome things")
-                          .arg(clap::Arg::with_name("PATTERN")
-                               .help("Pattern to search for")
-                               .required(true)
-                               .index(1))
-                          .get_matches();
+    let matches = clap::App::new("Vault Hunter")
+        .version("0.1")
+        .author("MetroWind <chris.corsair@gmail.com>")
+        .about("Personal password manager on top of HashiCorp Vault.")
+        .arg(clap::Arg::with_name("PATTERN")
+             .help("Pattern to search for")
+             .required(true)
+             .index(1))
+        .get_matches();
 
     let conf = if let Some(path) = hunter::findConfigFile()
     {
@@ -34,5 +34,6 @@ async fn main() -> Result<(), Error>
 
     let mut client = vault_client::Client::new(&conf)?;
     client.login().await?;
-    hunter::searchReveal(&client, matches.value_of("PATTERN").unwrap(), &conf).await
+    hunter::searchReveal(&client, matches.value_of("PATTERN").unwrap(), &conf)
+        .await
 }

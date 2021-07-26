@@ -1,0 +1,44 @@
+on: [push]
+
+name: Build head
+
+jobs:
+  build-linux:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - run: strip target/release/vault-hunter
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: vault-hunter-linux
+          path: target/release/vault-hunter
+
+  build-mac:
+    name: Build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - run: strip target/release/vault-hunter
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: vault-hunter-mac
+          path: target/release/vault-hunter
