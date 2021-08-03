@@ -1,6 +1,5 @@
 use std::io::{stdin,stdout,Write};
 use std::process::Command;
-use std::path::PathBuf;
 
 use crate::vault_client::Client;
 use crate::error::Error;
@@ -130,36 +129,4 @@ pub async fn searchReveal(client: &Client<'_>, pattern: &str, conf: &Config) ->
         println!("Invalid input");
     };
     revealPath(client, paths[choice].to_string(), conf).await
-}
-
-pub fn findConfigFile() -> Option<PathBuf>
-{
-    let basename = "vault-hunter.toml";
-    if let Ok(path) = std::env::var("XDG_CONFIG_HOME")
-    {
-        if !path.is_empty()
-        {
-            let mut p = PathBuf::from(path);
-            p.push(basename);
-            if p.exists()
-            {
-                return Some(p);
-            }
-        }
-    }
-
-    if let Ok(path) = std::env::var("HOME")
-    {
-        if !path.is_empty()
-        {
-            let mut p = PathBuf::from(path);
-            p.push(".config");
-            p.push(basename);
-            if p.exists()
-            {
-                return Some(p);
-            }
-        }
-    }
-    None
 }

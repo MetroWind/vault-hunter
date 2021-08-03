@@ -23,7 +23,7 @@ async fn main() -> Result<(), Error>
              .index(1))
         .get_matches();
 
-    let conf = if let Some(path) = hunter::findConfigFile()
+    let conf = if let Some(path) = config::findConfigFile()
     {
         config::Config::fromfile(&path)?
     }

@@ -1,9 +1,63 @@
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
 use crate::error::Error;
+
+fn findConfigDir() -> Option<PathBuf>
+{
+    let dirname = "vault-hunter";
+    if let Ok(path) = std::env::var("XDG_CONFIG_HOME")
+    {
+        if !path.is_empty()
+        {
+            let mut p = PathBuf::from(path);
+            p.push(dirname);
+            return Some(p);
+        }
+    }
+
+    if let Ok(path) = std::env::var("HOME")
+    {
+        if !path.is_empty()
+        {
+            let mut p = PathBuf::from(path);
+            p.push(".config");
+            p.push(dirname);
+            return Some(p);
+        }
+    }
+    None
+}
+
+pub fn findConfigFile() -> Option<PathBuf>
+{
+    let basename = "config.toml";
+    if let Some(mut p) = findConfigDir()
+    {
+        p.push(basename);
+        if p.exists()
+        {
+            return Some(p);
+        }
+    }
+    None
+}
+
+/// Return the default path of the runtime info file. Return what the
+/// path should be if the files does not exist. Return None if the
+/// path cannot be determined.
+fn findRuntimeInfoFile() -> Option<PathBuf>
+{
+    let basename = "runtime.json";
+    if let Some(mut p) = findConfigDir()
+    {
+        p.push(basename);
+        return Some(p);
+    }
+    None
+}
 
 #[derive(Deserialize)]
 pub struct Config
@@ -12,12 +66,18 @@ pub struct Config
     pub ca_certs: Vec<String>,
     /// End point to the Vault HTTP API
     pub end_point: String,
-    pub username: String,
+    /// The username. The userpass authentication in Vault
+    /// automatically lowercase this. So it does not have to be
+    /// all-lowercase in the config file.
+    username: String,
     /// A program that copy the content of stdin to the OS’s
     /// clipboard. By default this `xclip` in Linux, and `pbcopy` in
     /// macOS. Password is piped to this program. If this is not
     /// found, the password is printed.
     pub clipboard_prog: Option<String>,
+    /// Location of the cache file that stores the token. By default
+    /// it’s $XDG_CONFIG_HOME/vault-hunter/runtime-info.json
+    pub cache_path: Option<String>,
 }
 
 impl Config
@@ -46,6 +106,31 @@ impl Config
             }
         }
     }
+
+    /// The username in lowercase. The userpass authentication in
+    /// Vault automatically lowercase this; however this is also used
+    /// to construct URIs. Vault treats URI in a case-sensitive
+    /// manner. So we lowercase the username internally for
+    /// consistency.
+    pub fn username(&self) -> String
+    {
+        self.username.to_lowercase()
+    }
+
+    /// Return the path of the runtime info file. Return what the path
+    /// should be if the files does not exist. Return None if the path
+    /// cannot be determined.
+    pub fn runtimeInfoPath(&self) -> Option<PathBuf>
+    {
+        if let Some(p) = &self.cache_path
+        {
+            Some(PathBuf::from(p))
+        }
+        else
+        {
+            findRuntimeInfoFile()
+        }
+    }
 }
 
 impl Default for Config
@@ -53,13 +138,11 @@ impl Default for Config
     fn default() -> Self
     {
         Self {
-            ca_certs: vec![
-                String::from("/home/metrowind/ca-xeno-root.pem"),
-                String::from("/home/metrowind/ca-xeno-inter.pem"),
-            ],
+            ca_certs: Vec::new(),
             end_point: String::from("https://localhost/"),
             username: String::from("metrowind"),
             clipboard_prog: None,
+            cache_path: None,
         }
     }
 }

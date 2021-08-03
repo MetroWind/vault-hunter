@@ -139,53 +139,63 @@ impl<'a> Client<'a>
         })
     }
 
-    fn setRuntimeInfo(&self, key: &str, value: Option<&str>) -> Result<(), Error>
+    /// Set a key-value in the runtime info file. If the file path
+    /// cannot be determined, do nothing and return Ok.
+    fn setRuntimeInfo(&self, key: &str, value: Option<&str>) ->
+        Result<(), Error>
     {
-        let file_path = StdPath::new("runtime.json");
         let mut data = serde_json::Value::default();
-        if file_path.exists()
+        if let Some(file_path) = self.config.runtimeInfoPath()
         {
-            let file = File::open(file_path).map_err(
-                |_| error!(RuntimeError, "Failed to open runtime info file"))?;
-            let reader = BufReader::new(file);
-            data = serde_json::from_reader(reader).map_err(
-                |_| error!(RuntimeError, "Failed to read JSON from runtime info file"))?;
+            if file_path.exists()
+            {
+                let file = File::open(&file_path).map_err(
+                    |_| rterr!("Failed to open runtime info file"))?;
+                let reader = BufReader::new(file);
+                data = serde_json::from_reader(reader).map_err(
+                    |_| rterr!("Failed to read JSON from runtime info file"))?;
+            }
+            if let Some(v) = value
+            {
+                data[key] = serde_json::Value::String(v.to_owned());
+            }
+            else
+            {
+                data[key] = serde_json::Value::Null;
+            }
+            let file = File::create(file_path).map_err(
+                |_| rterr!("Failed to open runtime info file"))?;
+            serde_json::to_writer_pretty(file, &data).map_err(
+                |_| rterr!("Failed to write runtime info"))?;
         }
-        if let Some(v) = value
-        {
-            data[key] = serde_json::Value::String(v.to_owned());
-        }
-        else
-        {
-            data[key] = serde_json::Value::Null;
-        }
-        let file = File::create(file_path).map_err(
-            |_| error!(RuntimeError, "Failed to open runtime info file"))?;
-        serde_json::to_writer_pretty(file, &data).map_err(
-            |_| error!(RuntimeError, "Failed to write runtime info"))?;
         Ok(())
     }
 
     fn getRuntimeInfo(&self, key: &str) -> Result<String, Error>
     {
-        let file_path = StdPath::new("runtime.json");
-        if file_path.exists()
+        if let Some(file_path) = self.config.runtimeInfoPath()
         {
-            let file = File::open(file_path).map_err(
-                |_| error!(RuntimeError, "Failed to open runtime info file"))?;
-            let reader = BufReader::new(file);
-            let data: serde_json::Value = serde_json::from_reader(reader)
-                .map_err(|_| error!(
-                    RuntimeError,
-                    "Failed to read JSON from runtime info file"))?;
-            data[key].as_str().map(|s| s.to_owned()).ok_or(
-                error!(RuntimeError, "Invalid runtime info"))
+            if file_path.exists()
+            {
+                let file = File::open(file_path).map_err(
+                    |_| rterr!("Failed to open runtime info file"))?;
+                let reader = BufReader::new(file);
+                let data: serde_json::Value = serde_json::from_reader(reader)
+                    .map_err(|_| error!(
+                        RuntimeError,
+                        "Failed to read JSON from runtime info file"))?;
+                data[key].as_str().map(|s| s.to_owned()).ok_or(
+                    rterr!("Invalid runtime info"))
+            }
+            else
+            {
+                Err(rterr!("No runtime info available"))
+            }
         }
         else
         {
-            return Err(error!(RuntimeError, "No runtime info available"));
+            Err(rterr!("No runtime info available"))
         }
-
     }
 
     fn buildReq(&self, method: reqwest::Method, url: &str) ->
@@ -241,12 +251,12 @@ impl<'a> Client<'a>
     {
         let res: serde_json::Value =
             self.client.post(&format!("{}v1/auth/userpass/login/{}",
-                                      self.end_point, self.config.username))
+                                      self.end_point, self.config.username()))
             .json(&json!({"password": password, "token_max_ttl": 3600 * 24}))
             .send().await.map_err(
                 |e| error!(HTTPError, "Failed to send login request: {}", e))?
             .json().await.map_err(
-                |_| error!(RuntimeError, "Failed to parse JSON"))?;
+                |_| rterr!("Failed to parse JSON"))?;
         if let Some(msg) = res["errors"][0].as_str()
         {
             return Err(error!(VaultError, "Failed to login: {}", msg));
@@ -265,7 +275,7 @@ impl<'a> Client<'a>
             .send().await.map_err(
                 |e| error!(HTTPError, "Failed to send token lookup request: {}", e))?
             .json().await.map_err(
-                |_| error!(RuntimeError, "Failed to parse JSON"))?;
+                |_| rterr!("Failed to parse JSON"))?;
         if let Some(msg) = res["errors"][0].as_str()
         {
             return Err(error!(VaultError, "Failed to lookup token: {}", msg));
@@ -282,7 +292,7 @@ impl<'a> Client<'a>
     pub async fn loginPromptPassword(&mut self) -> Result<(), Error>
     {
         let pass = rpassword::read_password_from_tty(Some("Password: "))
-            .map_err(|_| error!(RuntimeError, "Failed to read password"))?;
+            .map_err(|_| rterr!("Failed to read password"))?;
         self.loginNew(&pass).await
     }
 
@@ -304,27 +314,28 @@ impl<'a> Client<'a>
 
     pub async fn list(&self, path: &str) -> Result<Vec<KeyOrDir>, Error>
     {
-        let res: serde_json::Value =
-            self.buildReq(reqwest::Method::from_str("LIST").unwrap(),
-                          &format!("{}/v1/passwords/metadata/{}/{}",
-                                   self.end_point, self.config.username, path))
+        let abs_path = &format!("{}/v1/passwords/metadata/{}/{}",
+                                self.end_point, self.config.username(), path);
+        let res: serde_json::Value = self.buildReq(
+            reqwest::Method::from_str("LIST").unwrap(), abs_path)
             .send().await.map_err(
                 |e| error!(HTTPError, "Failed to send login request: {}", e))?
             .json().await.map_err(
-                |_| error!(RuntimeError, "Failed to parse JSON"))?;
+                |_| rterr!("Failed to parse JSON"))?;
         if let Some(msg) = res["errors"][0].as_str()
         {
-            return Err(error!(VaultError, "Failed to list {}: {}", path, msg));
+            return Err(error!(VaultError, "Failed to list {}: {}",
+                              abs_path, msg));
         }
 
         // Each item listed could be a key or a directory. As far as I
         // know the only way to tell is to see if there a tailing
         // slash.
         res["data"]["keys"].as_array().ok_or_else(
-                || error!(RuntimeError, "List result is not a list"))?
+                || rterr!("List result is not a list"))?
             .iter().map(|v: &serde_json::Value| {
                 let item = v.as_str().ok_or_else(
-                    || error!(RuntimeError, "List item is not a string"))?;
+                    || rterr!("List item is not a string"))?;
                 if item.ends_with('/')
                 {
                     Ok(KeyOrDir::Dir(item[..item.len()-1].to_owned()))
@@ -339,17 +350,17 @@ impl<'a> Client<'a>
     /// Retrieve the key-value paired stored at `path`.
     pub async fn get(&self, path: &str) -> Result<StringMap, Error>
     {
-        // println!("Getting {}...", path);
         let mut res: serde_json::Value =
             self.buildReq(reqwest::Method::GET, &format!(
-                "{}/v1/passwords/data/{}/{}", self.end_point, self.config.username,
-                path))
+                "{}/v1/passwords/data/{}/{}", self.end_point,
+                self.config.username(), path))
             .send().await.map_err(
                 |e| error!(HTTPError, "Failed to send get request: {}", e))?
             .json().await.map_err(
-                |_| error!(RuntimeError, "Failed to parse JSON"))?;
-        let result: StringMap = serde_json::from_value(res["data"]["data"].take())
-            .map_err(|_| error!(RuntimeError, "Get result is not a dict"))?;
+                |_| rterr!("Failed to parse JSON"))?;
+        let result: StringMap = serde_json::from_value(
+            res["data"]["data"].take())
+            .map_err(|_| rterr!("Get result is not a dict"))?;
         Ok(result)
     }
 
