@@ -23,6 +23,24 @@ jobs:
           name: vault-hunter-linux
           path: target/release/vault-hunter
 
+  build-windows:
+    name: Build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: vault-hunter-windows
+          path: target/release/vault-hunter
+
   build-mac:
     name: Build
     runs-on: macos-latest

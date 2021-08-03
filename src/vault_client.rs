@@ -288,7 +288,10 @@ impl<'a> Client<'a>
 
     pub async fn login(&mut self) -> Result<(), Error>
     {
-        self.loginUsingCachedToken()?;
+        if self.loginUsingCachedToken().is_ok()
+        {
+            return Ok(());
+        }
         if self.lookupToken().await.is_ok()
         {
             Ok(())
