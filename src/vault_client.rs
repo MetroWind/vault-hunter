@@ -1,4 +1,3 @@
-use std::path::Path as StdPath;
 use std::fs::File;
 use std::io::Read;
 use std::io::BufReader;
