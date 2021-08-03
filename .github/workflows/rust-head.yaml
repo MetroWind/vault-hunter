@@ -4,7 +4,7 @@ name: Build head
 
 jobs:
   build-linux:
-    name: Build
+    name: Build Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -24,7 +24,7 @@ jobs:
           path: target/release/vault-hunter
 
   build-windows:
-    name: Build
+    name: Build Windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
@@ -39,10 +39,10 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: vault-hunter-windows
-          path: target/release/vault-hunter
+          path: target/release/vault-hunter.exe
 
   build-mac:
-    name: Build
+    name: Build macOS
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
