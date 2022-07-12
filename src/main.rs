@@ -72,6 +72,10 @@ async fn main() -> Result<(), Error>
 
     let mut client = vault_client::Client::new(&conf)?;
     client.login().await?;
+    if conf.local_xml.is_some()
+    {
+        hunter::exportPasswords(&client, &conf).await?;
+    }
     hunter::searchReveal(&client, matches.value_of("PATTERN").unwrap(), &conf)
         .await
 }

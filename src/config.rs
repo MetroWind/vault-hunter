@@ -59,10 +59,13 @@ fn findRuntimeInfoFile() -> Option<PathBuf>
     None
 }
 
+fn defaultXMLExportPeriod() -> i64 { 86400 }
+
 #[derive(Deserialize)]
 pub struct Config
 {
     /// CA certificates files for HTTPS
+    #[serde(default)]
     pub ca_certs: Vec<String>,
     /// End point to the Vault HTTP API
     pub end_point: String,
@@ -78,6 +81,14 @@ pub struct Config
     /// Location of the cache file that stores the token. By default
     /// it’s $XDG_CONFIG_HOME/vault-hunter/runtime-info.json
     pub cache_path: Option<String>,
+    /// Whether and where to regularly export a local encrypted XML of
+    /// all the passwords.
+    pub local_xml: Option<String>,
+    /// Use this GPG user’s public key to encrypt the XML.
+    pub gpg_user: Option<String>,
+    /// Time period of XML export.
+    #[serde(default = "defaultXMLExportPeriod")]
+    pub xml_export_period: i64,
 }
 
 impl Config
@@ -143,6 +154,9 @@ impl Default for Config
             username: String::from("metrowind"),
             clipboard_prog: None,
             cache_path: None,
+            local_xml: None,
+            gpg_user: None,
+            xml_export_period: 86400,
         }
     }
 }
