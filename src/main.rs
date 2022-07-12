@@ -5,6 +5,7 @@ use tokio;
 #[macro_use]
 mod error;
 mod config;
+mod runtime_info;
 mod vault_client;
 mod hunter;
 

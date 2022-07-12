@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::Read;
-use std::io::BufReader;
 use std::fmt;
 use std::str::FromStr;
 use std::collections::HashMap;
@@ -11,6 +10,7 @@ use rpassword;
 
 use crate::error::Error;
 use crate::config;
+use crate::runtime_info::{setRuntimeInfo, getRuntimeInfo};
 
 pub type StringMap = HashMap<String, String>;
 
@@ -138,65 +138,6 @@ impl<'a> Client<'a>
         })
     }
 
-    /// Set a key-value in the runtime info file. If the file path
-    /// cannot be determined, do nothing and return Ok.
-    fn setRuntimeInfo(&self, key: &str, value: Option<&str>) ->
-        Result<(), Error>
-    {
-        let mut data = serde_json::Value::default();
-        if let Some(file_path) = self.config.runtimeInfoPath()
-        {
-            if file_path.exists()
-            {
-                let file = File::open(&file_path).map_err(
-                    |_| rterr!("Failed to open runtime info file"))?;
-                let reader = BufReader::new(file);
-                data = serde_json::from_reader(reader).map_err(
-                    |_| rterr!("Failed to read JSON from runtime info file"))?;
-            }
-            if let Some(v) = value
-            {
-                data[key] = serde_json::Value::String(v.to_owned());
-            }
-            else
-            {
-                data[key] = serde_json::Value::Null;
-            }
-            let file = File::create(file_path).map_err(
-                |_| rterr!("Failed to open runtime info file"))?;
-            serde_json::to_writer_pretty(file, &data).map_err(
-                |_| rterr!("Failed to write runtime info"))?;
-        }
-        Ok(())
-    }
-
-    fn getRuntimeInfo(&self, key: &str) -> Result<String, Error>
-    {
-        if let Some(file_path) = self.config.runtimeInfoPath()
-        {
-            if file_path.exists()
-            {
-                let file = File::open(file_path).map_err(
-                    |_| rterr!("Failed to open runtime info file"))?;
-                let reader = BufReader::new(file);
-                let data: serde_json::Value = serde_json::from_reader(reader)
-                    .map_err(|_| error!(
-                        RuntimeError,
-                        "Failed to read JSON from runtime info file"))?;
-                data[key].as_str().map(|s| s.to_owned()).ok_or(
-                    rterr!("Invalid runtime info"))
-            }
-            else
-            {
-                Err(rterr!("No runtime info available"))
-            }
-        }
-        else
-        {
-            Err(rterr!("No runtime info available"))
-        }
-    }
-
     fn buildReq(&self, method: reqwest::Method, url: &str) ->
         reqwest::RequestBuilder
     {
@@ -241,7 +182,7 @@ impl<'a> Client<'a>
                 |e| error!(VaultError, "Failed to logout: {}", e))?;
         }
         self.token = None;
-        self.setRuntimeInfo("token", None)
+        setRuntimeInfo("token", None, self.config)
     }
 
     /// Login using a username and a password. Acquire and cache a new
@@ -261,7 +202,8 @@ impl<'a> Client<'a>
             return Err(error!(VaultError, "Failed to login: {}", msg));
         }
         self.token = res["auth"]["client_token"].as_str().map(|t| t.to_owned());
-        self.setRuntimeInfo("token", Some(&self.token.as_ref().unwrap()))?;
+        setRuntimeInfo("token", Some(&self.token.as_ref().unwrap()),
+                       self.config)?;
 
         Ok(())
     }
@@ -285,7 +227,7 @@ impl<'a> Client<'a>
 
     pub fn loginUsingCachedToken(&mut self) -> Result<(), Error>
     {
-        self.token = Some(self.getRuntimeInfo("token")?);
+        self.token = getRuntimeInfo("token", self.config)?;
         Ok(())
     }
 
