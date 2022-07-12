@@ -10,7 +10,7 @@ serde = { version = ">=1.0", features = ["derive"] }
 serde_json = ">=1.0"
 reqwest = { version = ">=0.11", features = ["json"] }
 tokio = { version = ">=1", features = ["rt-multi-thread", "macros"] }
-rpassword = ">=5.0"
+rpassword = ">=7.0"
 clap = "~2"
 quick-xml = ">=0.23"
 chrono = ">=0.4"

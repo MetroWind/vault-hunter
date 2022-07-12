@@ -233,7 +233,7 @@ impl<'a> Client<'a>
 
     pub async fn loginPromptPassword(&mut self) -> Result<(), Error>
     {
-        let pass = rpassword::read_password_from_tty(Some("Password: "))
+        let pass = rpassword::prompt_password("Password: ")
             .map_err(|_| rterr!("Failed to read password"))?;
         self.loginNew(&pass).await
     }
