@@ -87,6 +87,7 @@ async fn revealPath(client: &Client<'_>, path: String, conf: &Config) -> Result<
         if clipboardCopy(password, conf)?
         {
             println!("Password copied to clipboard.");
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
         else
         {
