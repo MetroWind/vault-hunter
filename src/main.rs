@@ -19,8 +19,14 @@ async fn main() -> Result<(), Error>
         .about("Personal password manager on top of HashiCorp Vault.")
         .arg(clap::Arg::with_name("PATTERN")
              .help("Pattern to search for")
-             .required(true)
+             .required(false)
              .index(1))
+        .arg(clap::Arg::with_name("token-info")
+             .long("token-info").help("Print token info"))
+        .arg(clap::Arg::with_name("logout")
+             .long("logout").help("Logout before doing anything"))
+        .arg(clap::Arg::with_name("list-mounts")
+             .long("list-mounts").help("List mounts"))
         .get_matches();
 
     let conf = if let Some(path) = config::findConfigFile()
@@ -31,6 +37,37 @@ async fn main() -> Result<(), Error>
     {
         config::Config::default()
     };
+
+    if matches.is_present("logout")
+    {
+        let mut client = vault_client::Client::new(&conf)?;
+        if client.loginUsingCachedToken().is_ok()
+        {
+            client.logout().await?;
+        }
+    }
+    if matches.is_present("token-info")
+    {
+        let mut client = vault_client::Client::new(&conf)?;
+        client.loginUsingCachedToken()?;
+        let info: serde_json::Value = client.lookupToken().await?;
+        println!("{}", serde_json::to_string_pretty(&info).unwrap());
+        return Ok(());
+    }
+    if matches.is_present("list-mounts")
+    {
+        let mut client = vault_client::Client::new(&conf)?;
+        client.login().await?;
+        let data = client.listMounts().await?;
+        println!("{}", serde_json::to_string_pretty(&data).unwrap());
+        return Ok(());
+    }
+
+    // Key lookup
+    if !matches.is_present("PATTERN")
+    {
+        return Err(rterr!("Expecting PATTERN"));
+    }
 
     let mut client = vault_client::Client::new(&conf)?;
     client.login().await?;

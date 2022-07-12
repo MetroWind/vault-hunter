@@ -266,23 +266,24 @@ impl<'a> Client<'a>
         Ok(())
     }
 
-    pub async fn lookupToken(&self) -> Result<(), Error>
+    pub async fn lookupToken(&self) -> Result<serde_json::Value, Error>
     {
         let res: serde_json::Value =
             self.buildReq(reqwest::Method::GET, &format!(
                 "{}/v1/auth/token/lookup-self",self.end_point))
             .send().await.map_err(
-                |e| error!(HTTPError, "Failed to send token lookup request: {}", e))?
+                |e| error!(HTTPError,
+                           "Failed to send token lookup request: {}", e))?
             .json().await.map_err(
                 |_| rterr!("Failed to parse JSON"))?;
         if let Some(msg) = res["errors"][0].as_str()
         {
             return Err(error!(VaultError, "Failed to lookup token: {}", msg));
         }
-        Ok(())
+        Ok(res)
     }
 
-    fn loginUsingCachedToken(&mut self) -> Result<(), Error>
+    pub fn loginUsingCachedToken(&mut self) -> Result<(), Error>
     {
         self.token = Some(self.getRuntimeInfo("token")?);
         Ok(())
@@ -397,5 +398,13 @@ impl<'a> Client<'a>
             to_search = next_to_search;
         }
         Ok(result)
+    }
+
+    pub async fn listMounts(&self) -> Result<serde_json::Value, Error>
+    {
+        self.client.get(&format!("{}v1/sys/mounts", self.end_point))
+            .send().await
+            .map_err(|e| error!(HTTPError, "Failed to send request: {}", e))?
+            .json().await.map_err(|_| rterr!("Failed to parse JSON"))
     }
 }
